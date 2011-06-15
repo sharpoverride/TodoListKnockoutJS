@@ -13,8 +13,8 @@
 				<div class="view" data-bind=" event:{ dblclick: allowEdit  } " title="Double click to edit...">
 					<input type="checkbox" data-bind="checked: isDone"> 
 					<span>
-					${ name }
-					</span>
+						${ name }
+					</span> <a class="destroy" data-bind="click: function(){ tasks.remove( task); } "></a>
 				</div>		
 				<div class="edit">
 					<input type="text" data-bind="value: name, event: {  blur: endEdit }">
@@ -55,11 +55,6 @@
 			var viewModel = {
 				tasks: new ko.observableArray(new Array()),
 				taskName: new ko.observable(""),
-				removeTask : function(model, task){
-					ko.utils.arrayRemoveItem(model.tasks, task);
-					model.tasks.valueHasMutated();
-				
-				}
 			};
 			viewModel.openTasks = new ko.dependentObservable(function() {
 
