@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="./application.css" type="text/css" charset="utf-8"/> 
+		<script type="text/javascript" language="javascript" src="./jquery-1.6.1.js"></script>
+		<script type="text/javascript" language="javascript" src="./jquery.tmpl.js"></script>
+		<script type="text/javascript" language="javascript" src="./knockout-1.2.1.debug.js"></script>
+		<script type="text/javascript" language="javascript" src="./json2.js"></script>	
+		<script type="text/html" id="tasksTemplate">
+		{{each(i, task) tasks()}}
+		
+			<div class="item" data-bind="css: { done: isDone }">
+				<div class="view" data-bind=" event:{ dblclick: allowEdit  } " title="Double click to edit...">
+					<input type="checkbox" data-bind="checked: isDone"> 
+					<span>
+					${ name }
+					</span>
+				</div>		
+				<div class="edit">
+					<input type="text" data-bind="value: name, event: {  blur: endEdit }">
+				</div>
+			</div>
+  
+		{{/each}}
+		</script>
+		
+		
+	</head>
+	<body>
+		<div id="views"> 
+			<div id="tasks"> 
+			  <h1>Todos</h1> 
+			  
+			  <p> 
+				<input id="addTaskInput" data-bind="value: taskName, event:{ keyup: addTask }" type="text" placeholder="What needs to be done?"/> 				
+			  </p> 
+			  
+			  <div class="items" data-bind="template: 'tasksTemplate'" ></div> 
+			  
+			  <footer> 
+				  <a class="clear" data-bind="event:{click: clearCompleted}">Clear completed</a> 
+				<div class="count"><span data-bind="text: openTasks()">&nbsp;</span> left</div> 
+			  </footer> 
+			</div> 
+		</div> 	
+
+		<script type="text/javascript" language="javascript">
+				
+			$(function(){
+			var isBinded = false;	
+			var task = function(name, isDone){
+				this.name = new ko.observable(name);
+				this.isDone = new ko.observable(isDone);
+			};
+			var viewModel = {
+				tasks: new ko.observableArray(new Array()),
+				taskName: new ko.observable(""),
+				removeTask : function(model, task){
+					ko.utils.arrayRemoveItem(model.tasks, task);
+					model.tasks.valueHasMutated();
+				
+				}
+			};
+			viewModel.openTasks = new ko.dependentObservable(function() {
+
+				var numTasks = this.tasks().length;
+				var allTasks = this.tasks();
+
+				var state = new Array();
+
+
+				for(var taskIdx=0; taskIdx < allTasks.length; taskIdx++ ){
+					var theTask = allTasks[taskIdx];
+					state.push( { name: theTask.name(), isDone: theTask.isDone() } );
+					if( theTask.isDone() ) numTasks --;
+				}
+				if( isBinded ){
+					localStorage['todos'] = JSON.stringify(state);
+				}
+
+				return numTasks;
+			}, viewModel);
+			
+			viewModel.addTask = function(event){
+			
+				if(event.keyCode == '13'){
+					var taskName = viewModel.taskName();
+					
+					viewModel.tasks.push( new task( taskName, false) );
+
+					viewModel.taskName("");
+				}
+				
+			};
+			viewModel.allowEdit = function(event){ 
+				// target is under div.item > span
+				var is_view = $(event.target).hasClass('view');
+				var dblClickedItem = $(event.target);
+				if(!is_view) dblClickedItem = $(event.target).parent();
+
+				var div_item =	dblClickedItem.parent();
+				var div_view =	dblClickedItem;
+				var div_edit = $('.edit', div_item ); 
+
+				div_view.hide();
+				div_edit.show();
+				div_edit.children().first().focus();
+			};
+			viewModel.endEdit = function(event){
+				var div_edit = $(event.target).parent();
+				var div_item = $(event.target).parent().parent();
+				var div_view = $('.view', div_item);
+				div_edit.hide();
+				div_view.show();
+			};
+			viewModel.clearCompleted = new ko.dependentObservable(
+					{
+					owner: viewModel,
+					read: function(){},
+					write: function(value){
+					if( isBinded ){
+						var removeStack = new Array();
+						var allTasks = viewModel.tasks();
+						for(var taskIdx=0; taskIdx < allTasks.length; taskIdx++ ){
+							var theTask = allTasks[taskIdx];				
+							if( theTask.isDone() ) removeStack.push( theTask );
+						}
+
+						for(var taskIdx=0; taskIdx < removeStack.length; taskIdx++ ){
+							console.log(removeStack[taskIdx]);
+							viewModel.tasks.remove( removeStack[taskIdx] ); 
+						}
+					}
+				}
+				});
+
+			(function loadFromStorage(){
+			 var persistedTasks = new Array();
+				var fromStorage = localStorage['todos']
+
+				if(undefined != fromStorage && null !== fromStorage){
+					persistedTasks = JSON.parse(fromStorage);
+				}
+
+				for(var idx = 0 ; idx < persistedTasks.length; idx++)
+				{
+					viewModel.tasks.push( new task( persistedTasks[idx]['name'], persistedTasks[idx]['isDone'] ) );
+				}
+			})();
+
+			ko.applyBindings(viewModel);
+			isBinded = true;
+
+			});
+		</script>		
+	</body>
+</html>
