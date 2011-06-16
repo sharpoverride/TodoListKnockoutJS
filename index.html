@@ -9,15 +9,15 @@
 		<script type="text/html" id="tasksTemplate">
 		{{each(i, task) tasks()}}
 		
-			<div class="item" data-bind="css: { done: isDone }">
-				<div class="view" data-bind=" event:{ dblclick: allowEdit  } " title="Double click to edit...">
+			<div class="item" data-bind="css: { done: isDone, editing: isBeingEdited }">
+				<div class="view" data-bind="event: { dblclick: function(event){ allowEdit(event, task);  } } " title="Double click to edit...">
 					<input type="checkbox" data-bind="checked: isDone"> 
 					<span>
 						${ name }
 					</span> <a class="destroy" data-bind="click: function(){ tasks.remove( task); } "></a>
 				</div>		
 				<div class="edit">
-					<input type="text" data-bind="value: name, event: {  blur: endEdit }">
+					<input type="text" data-bind="value: name, event: {  blur: function(event){ endEdit(event,task); } }">
 				</div>
 			</div>
   
@@ -46,32 +46,60 @@
 
 		<script type="text/javascript" language="javascript">
 				
-			$(function(){
+		$(function(){
+			var todosAddress = "todos";
+
 			var isBinded = false;	
 			var task = function(name, isDone){
 				this.name = new ko.observable(name);
 				this.isDone = new ko.observable(isDone);
+				this.isBeingEdited = new ko.observable(false);
 			};
 			var viewModel = {
 				tasks: new ko.observableArray(new Array()),
 				taskName: new ko.observable(""),
+			};
+
+			viewModel.saveTasks = function(value){
+
+				if( isBinded ){
+					var allTasks = value;
+					var state = new Array();
+
+
+					for(var taskIdx=0; taskIdx < allTasks.length; taskIdx++ ){
+						var theTask = allTasks[taskIdx];
+						state.push( { name: theTask.name(), isDone: theTask.isDone() } );
+					}
+					localStorage[todosAddress] = JSON.stringify(state);
+				}
+			};
+
+			
+			viewModel.load = function(){
+			 var persistedTasks = new Array();
+				var fromStorage = localStorage[todosAddress]
+
+				if(undefined != fromStorage && null !== fromStorage){
+					persistedTasks = JSON.parse(fromStorage);
+				}
+
+				for(var idx = 0 ; idx < persistedTasks.length; idx++)
+				{
+					viewModel.tasks.push( new task( persistedTasks[idx]['name'], persistedTasks[idx]['isDone'] ) );
+				}
 			};
 			viewModel.openTasks = new ko.dependentObservable(function() {
 
 				var numTasks = this.tasks().length;
 				var allTasks = this.tasks();
 
-				var state = new Array();
-
-
 				for(var taskIdx=0; taskIdx < allTasks.length; taskIdx++ ){
 					var theTask = allTasks[taskIdx];
-					state.push( { name: theTask.name(), isDone: theTask.isDone() } );
 					if( theTask.isDone() ) numTasks --;
 				}
-				if( isBinded ){
-					localStorage['todos'] = JSON.stringify(state);
-				}
+
+				viewModel.saveTasks(allTasks);
 
 				return numTasks;
 			}, viewModel);
@@ -87,26 +115,12 @@
 				}
 				
 			};
-			viewModel.allowEdit = function(event){ 
-				// target is under div.item > span
-				var is_view = $(event.target).hasClass('view');
-				var dblClickedItem = $(event.target);
-				if(!is_view) dblClickedItem = $(event.target).parent();
+			viewModel.allowEdit = function(event, theTask){ 
 
-				var div_item =	dblClickedItem.parent();
-				var div_view =	dblClickedItem;
-				var div_edit = $('.edit', div_item ); 
-
-				div_view.hide();
-				div_edit.show();
-				div_edit.children().first().focus();
+				theTask.isBeingEdited(true);
 			};
-			viewModel.endEdit = function(event){
-				var div_edit = $(event.target).parent();
-				var div_item = $(event.target).parent().parent();
-				var div_view = $('.view', div_item);
-				div_edit.hide();
-				div_view.show();
+			viewModel.endEdit = function(event, theTask){
+				theTask.isBeingEdited(false);
 			};
 			viewModel.clearCompleted = new ko.dependentObservable(
 					{
@@ -129,24 +143,13 @@
 				}
 				});
 
-			(function loadFromStorage(){
-			 var persistedTasks = new Array();
-				var fromStorage = localStorage['todos']
 
-				if(undefined != fromStorage && null !== fromStorage){
-					persistedTasks = JSON.parse(fromStorage);
-				}
-
-				for(var idx = 0 ; idx < persistedTasks.length; idx++)
-				{
-					viewModel.tasks.push( new task( persistedTasks[idx]['name'], persistedTasks[idx]['isDone'] ) );
-				}
-			})();
+			viewModel.load();
 
 			ko.applyBindings(viewModel);
 			isBinded = true;
 
-			});
+		});
 		</script>		
 	</body>
 </html>
